@@ -1,0 +1,57 @@
+name: Check for Updates
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight
+  workflow_dispatch:
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Check for updates
+        id: check
+        run: |
+          # Get current version from Manifest
+          CURRENT_VERSION=$(jq -r '.version' CloudronManifest.json)
+          echo "Current Cloudron App Version: $CURRENT_VERSION"
+          
+          # Ideally, we map Cloudron App Version to GlitchTip Version (e.g. 4.0.0 -> 4.0.0)
+          # Assuming 1-to-1 mapping for simplicity or using a strict versioning scheme.
+          
+          # Fetch latest GlitchTip tag from Docker Hub
+          LATEST_TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/glitchtip/glitchtip/tags/?page_size=5" | jq -r '.results[].name' | grep -v 'latest' | grep -v 'rc' | sort -V | tail -n 1)
+          
+          echo "Latest GlitchTip Tag: $LATEST_TAG"
+          
+          if [ "$CURRENT_VERSION" != "$LATEST_TAG" ]; then
+            echo "New version available!"
+            echo "update_available=true" >> $GITHUB_OUTPUT
+            echo "latest_version=$LATEST_TAG" >> $GITHUB_OUTPUT
+          else
+            echo "App is up to date."
+            echo "update_available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Manifest and Dockerfile
+        if: steps.check.outputs.update_available == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.latest_version }}"
+          
+          # Update CloudronManifest.json
+          tmp=$(mktemp)
+          jq --arg v "$VERSION" '.version = $v' CloudronManifest.json > "$tmp" && mv "$tmp" CloudronManifest.json
+          
+          # Update Dockerfile ARG if it was hardcoded (optional, currently it defaults to latest but checks manifest)
+          # If we want to pin it in the repo:
+          # sed -i "s/ARG GLITCHTIP_VERSION=.*/ARG GLITCHTIP_VERSION=$VERSION/" Dockerfile
+          
+          # Prepare commit
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add CloudronManifest.json
+          git commit -m "Update GlitchTip to version $VERSION"
+          git push

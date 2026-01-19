@@ -1,0 +1,18 @@
+{
+  "id": "io.glitchtip.cloudronapp",
+  "title": "GlitchTip",
+  "author": "Antigravity",
+  "description": "Open source error tracking, Sentry compatible.",
+  "version": "1.0.0",
+  "healthCheckPath": "/",
+  "httpPort": 8000,
+  "addons": {
+    "postgresql": {},
+    "redis": {},
+    "sendmail": {},
+    "localstorage": {}
+  },
+  "manifestVersion": 2,
+  "website": "https://glitchtip.com",
+  "contactEmail": "support@cloudron.io"
+}
